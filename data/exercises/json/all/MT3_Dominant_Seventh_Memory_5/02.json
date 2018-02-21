@@ -1,15 +1,15 @@
 {
   "type": "matching",
-  "introText": "Say-and-play \"scale degree five\" and go!",
+  "introText": "DOMINANT SEVENTH DRILL. Narration (of scale degrees, then voice leading): \"degrees 5, 4, 7; alto stays, others move.\"",
   "keySignature": "##",
   "key": "jD_",
   "chord": [
     {"visible":[57,69],"hidden":[],"rhythmValue":"h"},
-    {"visible":[67],"hidden":[],"rhythmValue":"h"},
-    {"visible":[73],"hidden":[],"rhythmValue":"h"},
-    {"visible":[69],"hidden":[],"rhythmValue":"w"},
-    {"visible":[57,67,69,73],"hidden":[],"rhythmValue":"h"},
-    {"visible":[50,66,69,74],"hidden":[],"rhythmValue":"w"}
+    {"visible":[],"hidden":[67],"rhythmValue":"h"},
+    {"visible":[],"hidden":[73],"rhythmValue":"h"},
+    {"visible":[],"hidden":[69],"rhythmValue":"w"},
+    {"visible":[],"hidden":[57,67,69,73],"rhythmValue":"h"},
+    {"visible":[],"hidden":[50,66,69,74],"rhythmValue":"w"}
   ],
   "reviewText": "",
   "staffDistribution": "keyboardPlusRHBias",
