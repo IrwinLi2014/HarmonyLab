@@ -6,6 +6,7 @@ define([
     'vexflow',
     'app/config',
     'app/components/component',
+    'app/models/key_signature',
     'app/models/exercise_chord_bank',
     'app/models/exercise_definition',
     'app/models/exercise_context',
@@ -20,6 +21,7 @@ define([
     Vex, 
     Config,
     Component,
+    KeySignature,
     ExerciseChordBank,
     ExerciseDefinition,
     ExerciseContext,
@@ -508,6 +510,7 @@ define([
         onGoToExercise: function(target) {
             // window.location = target.url;
             var that = this;
+            var sheet = this.getSheet();
             $.ajax({
                 "url": target.url,
                 "method": "GET",
@@ -526,10 +529,20 @@ define([
                     definition: newDefinition
                 });
 
-                // HELPPPPP!!!!
-                // needs to be able to link to exercise sheet
+                // HELPPPPP!!!! Need to use parent music component to initilize instead of sheet component
+                var keySignature = new KeySignature(newDefinition.getKey(), newDefinition.getKeySignature());
+                var sheet = new ExerciseSheetComponent({
+                    exerciseContext: newContext,
+                    keySignature: keySignature
+                });
+                newContext.setSheet(sheet);
+                console.log(newContext);
+
+                sheet.initComponent();
+                sheet.render();
+                console.log(sheet);
             }).fail(function(jqXHR, textStatus) {
-                // fails to run. needs to be fixed
+                // error not properly handled
                 $el.html("").append("Error loading next exercise.");
             });
         }

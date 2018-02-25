@@ -53,6 +53,7 @@ define([
 		this.timer = null;
 		this.displayChords = this.createDisplayChords();
 		this.exerciseChords = this.createExerciseChords();
+		this.sheet = null;
 
 		var ex_num_current = this.definition.getExerciseList().reduce(function(selected, current, index) {
 			return (selected < 0 && current.selected) ? index + 1 : selected;
@@ -248,6 +249,15 @@ define([
 			return this;
 		},
 		/**
+		 * Sets exercise sheet component to settings.
+		 *
+		 * @return this
+		 */
+		setSheet: function(sheet) {
+			this.sheet = sheet;
+			return this;
+		},
+		/**
 		 * Returns true if the timer is non-null.
 		 *
 		 * @return {boolean}
@@ -304,6 +314,17 @@ define([
 				return "";
 			}
 			return parseInt(this.restarts);
+		},
+		/**
+		 * Returns sheet component.
+		 *
+		 * @return {object}
+		 */
+		getSheet: function() {
+			if(this.sheet) {
+				return this.sheet;
+			}
+			return null;
 		},
 		/**
 		 * Begins the timer.

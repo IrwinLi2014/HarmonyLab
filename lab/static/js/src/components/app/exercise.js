@@ -162,6 +162,7 @@ define([
 				c.init(this);
 				c.render();
 				this.addComponent(c);
+				this.models.exerciseContext.setSheet(c.settings.sheet);
 			}
 		];
 		return methods;
