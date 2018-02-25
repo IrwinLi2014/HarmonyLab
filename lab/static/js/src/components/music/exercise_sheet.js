@@ -31,6 +31,10 @@ define([
      */
     var CHORD_BANK_SIZE = Config.get('general.chordBank.displaySize');
 
+    var DEFAULT_RHYTHM_VALUE = Config.get('general.defaultRhythmValue');
+
+    var AUTO_ADVANCE_ENABLED = Config.get('general.autoExerciseAdvance');
+
     /**
      * ExerciseSheetComponent
      *
@@ -141,10 +145,22 @@ define([
                             '<p>Exercise <%= exercise_num %> of <%= exercise_list.length %></p>',
                         '<% } %>',
                         '<p><span class="exercise-status-state" style="background-color:<%= status_color %>"><%= status_text %> <%= status_icon %></span>',
-                        '<% if (typeof(time_to_complete) !== "undefined" && time_to_complete != "") { %>',
-                            '&nbsp;in&nbsp;<%= time_to_complete %></p>',// &nbsp;(<%= time_to_complete_series %>)
+                        '<% if (typeof(time_to_complete) !== "undefined" && time_to_complete != "" && status_text !== "finished with errors") { %>',
+                            '&nbsp;in&nbsp;<%= time_to_complete %></p>',
                         '<% } %>',
-                        '<% if (typeof(next_exercise) !== "undefined" && next_exercise != "") { %>',
+                        '<% if (typeof(min_tempo) !== "undefined" && min_tempo != "" && typeof(max_tempo) !== "undefined" && max_tempo != "") { %>',
+                            '<p>Tempo&nbsp;<%= min_tempo %>&ndash;<%= max_tempo %></p>',
+                        '<% } %>',
+                        '<% if (typeof(time_to_complete_series) !== "undefined" && time_to_complete_series != "") { %>',
+                            '<p>All&nbsp;done&nbsp;in&nbsp;<%= time_to_complete_series %></p>',
+                        '<% } %>',
+                        '<% if (typeof(ex_restarts) !== "undefined" && ex_restarts > 0) { %>',
+                            '<p>Made&nbsp;<%= ex_restarts %>&nbsp;restart(s)</p>',
+                        '<% } %>',
+                        '<% if (typeof(time_to_complete_series) !== "undefined" && time_to_complete_series != "" && typeof(group_min_tempo) !== "undefined" && group_min_tempo != "" && typeof(group_max_tempo) !== "undefined" && group_max_tempo != "") { %>',
+                            '<p>Overall tempo&nbsp;<%= group_min_tempo %>&ndash;<%= group_max_tempo %></p>',
+                        '<% } %>',
+                        '<% if (typeof(next_exercise) !== "undefined" && next_exercise != "" && auto_advance === false) { %>',
                             '<p><a class="exercise-status-next-btn" href="<%= next_exercise %>">Click for next</a></p>',
                         '<% } %>',
                     '</div>',
@@ -180,6 +196,7 @@ define([
                 tpl_data.next_exercise = exc.definition.getNextExercise();
             }
             tpl_data.prompt_text = "";
+            tpl_data.auto_advance = AUTO_ADVANCE_ENABLED;
 
             switch(exc.state) {
                 case exc.STATE.CORRECT:
@@ -188,17 +205,25 @@ define([
                     }
                     if(exc.hasTimer()) {
                         tpl_data.time_to_complete = exc.getExerciseDuration();
+                        tpl_data.min_tempo = exc.getMinTempo();
+                        tpl_data.max_tempo = exc.getMaxTempo();
                     }
                     if(exc.hasSeriesTimer()) {
                         tpl_data.time_to_complete_series = exc.getExerciseSeriesDuration();
+                        tpl_data.ex_restarts = exc.getExerciseGroupRestarts();
+                        tpl_data.group_min_tempo = exc.getGroupMinTempo();
+                        tpl_data.group_max_tempo = exc.getGroupMaxTempo();
                     }
                     break;
                 case exc.STATE.FINISHED:
                     if(exc.hasTimer()) {
                         tpl_data.time_to_complete = exc.getExerciseDuration();
+                        tpl_data.min_tempo = exc.getMinTempo();
+                        tpl_data.max_tempo = exc.getMaxTempo();
                     }
                     if(exc.hasSeriesTimer()) {
-                        tpl_data.time_to_complete_series = exc.getExerciseSeriesDuration();
+                        tpl_data.group_min_tempo = exc.getGroupMinTempo();
+                        tpl_data.group_max_tempo = exc.getGroupMaxTempo();
                     }
                     break;
                 case exc.STATE.READY:
@@ -292,20 +317,23 @@ define([
                 var elapsed_quarters = 0;
                 for(var j = 0; j < i; j++) {
                     var duration = 4;
-                    var rhythm_code = null;
+                    var rhythm_value = null;
                     if(display_items[j].chord.settings.rhythm) {
-                        rhythm_code = display_items[j].chord.settings.rhythm;
+                        rhythm_value = display_items[j].chord.settings.rhythm;
                     }
-                    if(rhythm_code === "w") {
+                    if(rhythm_value == null) {
+                        rhythm_value = DEFAULT_RHYTHM_VALUE;
+                    }
+
+                    if(rhythm_value === "w") {
                         duration = 4;
-                    }else if(rhythm_code === "h") {
+                    }else if(rhythm_value === "h") {
                         duration = 2;
-                    }else if(rhythm_code === "q") {
+                    }else if(rhythm_value === "q") {
                         duration = 1;
                     }
                     elapsed_quarters += duration;
                 }
-                window.console.dir(elapsed_quarters);
 
                 display_chord = display_items[i].chord;
                 exercise_chord = exercise_items[i].chord;
@@ -356,16 +384,21 @@ define([
             var stave = new Stave(clef, position);
             var rhythmDivisor = null;
             if(exerciseChord.settings.rhythm) {
-                var rhythmValue = exerciseChord.settings.rhythm;
-                if(rhythmValue === "h") {
+                var rhythm_value = exerciseChord.settings.rhythm;
+                if(rhythm_value == null) {
+                    rhythm_value = DEFAULT_RHYTHM_VALUE;
+                }
+
+                if(rhythm_value === "w") {
+                    rhythmDivisor = 1;
+                }else if(rhythm_value === "h") {
                     rhythmDivisor = 2;
-                }else if(rhythmValue === "q") {
+                }else if(rhythm_value === "q") {
                     rhythmDivisor = 4;
-                }else if(rhythmValue === "w") {
+                }else {// should be false
                     rhythmDivisor = 1;
                 }
             }
-            var elapsedQuarters = elapsed_quarters;
 
             stave.setRenderer(this.vexRenderer);
             stave.setKeySignature(this.keySignature);
@@ -382,7 +415,7 @@ define([
                 analyzeConfig: this.getAnalyzeConfig()
             }));
             stave.setMaxWidth(this.getWidth());
-            stave.updatePositionWithRhythm(rhythmDivisor, elapsedQuarters);
+            stave.updatePositionWithRhythm(rhythmDivisor, elapsed_quarters);
 
             return stave;
         },

@@ -22,6 +22,8 @@ define([
 
 	var REPEAT_EXERCISE_ENABLED = Config.get('general.repeatExercise');
 
+	var DEFAULT_RHYTHM_VALUE = Config.get('general.defaultRhythmValue');
+
 	/**
 	 * ExerciseContext object coordinates the display and grading of
 	 * an exercise.
@@ -49,9 +51,36 @@ define([
 		this.state = ExerciseContext.STATE.READY;
 		this.graded = false;
 		this.timer = null;
-		this.seriesTimer = null;
 		this.displayChords = this.createDisplayChords();
 		this.exerciseChords = this.createExerciseChords();
+
+		var ex_num_current = this.definition.getExerciseList().reduce(function(selected, current, index) {
+			return (selected < 0 && current.selected) ? index + 1 : selected;
+		}, -1);
+		if(ex_num_current == 1) {
+			sessionStorage.removeItem('HarmonyLabExGroupStartTime');
+			sessionStorage.removeItem('HarmonyLabExGroupTracker');
+			sessionStorage.removeItem('HarmonyLabExGroupRestarts');
+			sessionStorage.removeItem('HarmonyLabExGroupMinTempo');
+			sessionStorage.removeItem('HarmonyLabExGroupMaxTempo');
+			this.seriesTimer = null;
+			this.restarts = null;
+		}else if(sessionStorage.HarmonyLabExGroupStartTime) {
+			var sessionSeriesTimer = sessionStorage.getItem('HarmonyLabExGroupStartTime');
+			this.resetSeriesTimer();
+			this.seriesTimer.start = sessionSeriesTimer;
+			if(sessionStorage.HarmonyLabExGroupRestarts) {// should be met
+				this.restarts = sessionStorage.getItem('HarmonyLabExGroupRestarts');
+			}else {// should be redundant
+				window.console.dir('unexpected condition');
+				this.restarts = 0;
+			}
+		}else {
+			this.seriesTimer = null;
+			this.restarts = null;
+		}
+
+		this.timepoints = [];
 
 		_.bindAll(this, ['grade', 'onFirstNoteBeginTimer']);
 
@@ -89,6 +118,18 @@ define([
 			this.inputChords.bind("change", this.grade);
 		},
 		/**
+		 * For tempo assessment
+		 */
+		makeTimestamp: function() {
+			var timestamp = (new Date().getTime() / 1000);
+			if(this.graded.activeIndex != undefined && !this.timepoints[this.graded.activeIndex]) {
+				this.timepoints.push([this.graded.activeIndex, timestamp]);
+			}else if(this.graded.activeIndex == undefined && !this.timepoints[this.graded.activeIndex]) {
+				// Here, the first input received fulfills the first chord.
+				this.timepoints.push([0, timestamp]);
+			}
+		},
+		/**
 		 * Runs the grading process for the given exercise definition
 		 * and input chords.
 		 *
@@ -103,8 +144,27 @@ define([
 
 			switch(graded.result) {
 				case this.grader.STATE.CORRECT:
+					this.makeTimestamp();
 					this.done = true;
+
+					var ex_num_current = this.definition.getExerciseList().reduce(function(selected, current, index) {
+						return (selected < 0 && current.selected) ? index + 1 : selected;
+					}, -1);
+					var ex_num_prior = parseInt(sessionStorage.getItem('HarmonyLabExGroupTracker'));
+					if(ex_num_current == ex_num_prior + 1) {
+						sessionStorage.setItem('HarmonyLabExGroupTracker', ex_num_current);
+					}else if(ex_num_current == ex_num_prior) {
+						// window.console.dir('detected restart');
+						var restart_count = parseInt(sessionStorage.getItem('HarmonyLabExGroupRestarts')) + 1;
+						this.restarts = restart_count;
+						sessionStorage.setItem('HarmonyLabExGroupRestarts', restart_count);
+						sessionStorage.setItem('HarmonyLabExGroupTracker', ex_num_current);
+					}else {
+						sessionStorage.setItem('HarmonyLabExGroupTracker', -1);
+					}
+
 					this.endTimer();
+
 					if(!nextUrl) {
 						this.endSeriesTimer();
 					}
@@ -125,12 +185,15 @@ define([
 					}
 					break;
 				case this.grader.STATE.INCORRECT:
+					this.makeTimestamp();
 					state = ExerciseContext.STATE.INCORRECT;
 					this.done = false;
 					this.flawless = false;
-					this.seriesFlawless = false;
+					/* The seriesFlawless value may be useful in addition to restarts. */
+					// this.seriesFlawless = false;
 					break;
 				case this.grader.STATE.PARTIAL:
+					this.makeTimestamp();
 				default:
 					state = ExerciseContext.STATE.WAITING;
 					this.done = false;
@@ -159,12 +222,6 @@ define([
 			}
 			if(this.seriesTimer == null) {
 				this.beginSeriesTimer();
-				/**
-				 * Remembers errors
-				 */
-				if(this.seriesFlawless == null) {
-					this.seriesFlawless = true;
-				}
 			}
 		},
 		/**
@@ -178,6 +235,8 @@ define([
 			this.timer.end = null;
 			this.timer.duration = null;
 			this.timer.durationString = "";
+			this.timer.minTempo = null;
+			this.timer.maxTempo = null;
 			return this;
 		},
 		resetSeriesTimer: function() {
@@ -207,12 +266,44 @@ define([
 		getExerciseDuration: function() {
 			return this.timer.durationString;
 		},
-		/**
-		 * Not yet functional. Requires seriesTimer to be remembered from
-		 * one exercise to the next.
-		 */
+		getMinTempo: function() {
+			if(parseInt(this.timer.minTempo) == NaN) {
+				return "";
+			}
+			return this.timer.minTempo;
+		},
+		getMaxTempo: function() {
+			if(parseInt(this.timer.maxTempo) == NaN) {
+				return "";
+			}
+			return this.timer.maxTempo;
+		},
+		getGroupMinTempo: function() {
+			if(parseInt(sessionStorage.getItem('HarmonyLabExGroupMinTempo')) == NaN) {
+				return "";
+			}
+			return sessionStorage.getItem('HarmonyLabExGroupMinTempo');
+		},
+		getGroupMaxTempo: function() {
+			if(parseInt(sessionStorage.getItem('HarmonyLabExGroupMaxTempo')) == NaN) {
+				return "";
+			}
+			return sessionStorage.getItem('HarmonyLabExGroupMaxTempo');
+		},
 		getExerciseSeriesDuration: function() {
+			if(sessionStorage.getItem('HarmonyLabExGroupTracker') == -1) {
+				return "";
+			}
 			return this.seriesTimer.durationString;
+		},
+		getExerciseGroupRestarts: function() {
+			if(sessionStorage.getItem('HarmonyLabExGroupTracker') == -1) {
+				return "";
+			}
+			if(this.getExerciseSeriesDuration() == "") {
+				return "";
+			}
+			return parseInt(this.restarts);
 		},
 		/**
 		 * Begins the timer.
@@ -224,13 +315,6 @@ define([
 				this.resetTimer();
 			}
 			this.timer.start = (new Date().getTime() / 1000);
-			return this;
-		},
-		beginSeriesTimer: function() {
-			if(this.seriesTimer === null) {
-				this.resetSeriesTimer();
-			}
-			this.seriesTimer.start = (new Date().getTime() / 1000);
 			return this;
 		},
 		/**
@@ -251,15 +335,100 @@ define([
 					this.timer.durationString = mins + "&prime; " + seconds + "&Prime;";
 				}
 			}
+			var beatsPerMinute = [];
+			for(i = 1; i < this.timepoints.length; i++) {
+				var thisBPM = Math.round(60 / (this.timepoints[i][1] - this.timepoints[i-1][1]));
+				beatsPerMinute.push(thisBPM);
+			}
+			var semibreveCount = [];
+			for(i = 0; i < this.inputChords._items.length - 1; i++) {
+				var rhythm_value = this.exerciseChords.settings.chords[i].settings.rhythm;
+				if(rhythm_value == null) {
+					rhythm_value = DEFAULT_RHYTHM_VALUE;
+				}
+				/**
+				 * Prepares tempo calculation per half note (minim).
+				 * Rhythm values of "w", "h", "q" supported.
+				 * Compare Stave.createStaveVoice()
+				 * and Stave.updatePositionWithRhythm
+				 */
+				if(rhythm_value == "w") {
+					thisSemibreveCount = "1";
+				}else if(rhythm_value == "h") {
+					thisSemibreveCount = "0.5";
+				}else if(rhythm_value == "q") {
+					thisSemibreveCount = "0.25";
+				}else {// should be redundant
+					thisSemibreveCount = "1";
+				}
+				semibreveCount.push(thisSemibreveCount);
+			}
+			var calibratedBeatsPerMinute = [];
+			if(beatsPerMinute.length == semibreveCount.length && beatsPerMinute.length >= 1) {// should be true
+				for(i = 0; i < beatsPerMinute.length; i++) {
+					var thisCalibratedBPM = Math.round(beatsPerMinute[i] * semibreveCount[i]);
+					calibratedBeatsPerMinute.push(thisCalibratedBPM);
+				}
+				this.timer.minTempo = Math.min(... calibratedBeatsPerMinute);
+				this.timer.maxTempo = Math.max(... calibratedBeatsPerMinute);
+			}
+
+			var former_min_tempo = null;
+			var former_max_tempo = null;
+			if(sessionStorage.getItem('HarmonyLabExGroupMinTempo') && sessionStorage.getItem('HarmonyLabExGroupMinTempo') != "null") {
+				former_min_tempo = parseInt(sessionStorage.getItem('HarmonyLabExGroupMinTempo'));
+			}
+			if(sessionStorage.getItem('HarmonyLabExGroupMaxTempo') && sessionStorage.getItem('HarmonyLabExGroupMaxTempo') != "null") {
+				former_max_tempo = parseInt(sessionStorage.getItem('HarmonyLabExGroupMaxTempo'));
+			}
+
+			/* Updates tempo information in sessionStorage */
+			if(former_min_tempo == null) {
+				sessionStorage.setItem('HarmonyLabExGroupMinTempo', this.timer.minTempo);
+			}else {
+				var new_min_tempo = Math.min(this.timer.minTempo, former_min_tempo);
+				sessionStorage.setItem('HarmonyLabExGroupMinTempo', new_min_tempo);
+			}
+			if(former_max_tempo == null) {
+				sessionStorage.setItem('HarmonyLabExGroupMaxTempo', this.timer.maxTempo);
+			}else {
+				var new_max_tempo = Math.max(this.timer.maxTempo, former_max_tempo);
+				sessionStorage.setItem('HarmonyLabExGroupMaxTempo', new_max_tempo);
+			}
+
 			return this;
 		},
+		/**
+		 * Begins the timer for whole exercise group.
+		 *
+		 * @return this
+		 */
+		beginSeriesTimer: function() {
+			if(this.seriesTimer === null) {
+				this.resetSeriesTimer();
+			}
+			sessionStorage.setItem('HarmonyLabExGroupTracker', 0);
+			// window.console.dir('start series timer');
+			this.seriesTimer.start = (new Date().getTime() / 1000);
+			sessionStorage.setItem('HarmonyLabExGroupStartTime', this.seriesTimer.start);
+			sessionStorage.setItem('HarmonyLabExGroupRestarts', 0);
+			sessionStorage.setItem('HarmonyLabExGroupMinTempo', null);
+			sessionStorage.setItem('HarmonyLabExGroupMaxTempo', null);
+			return this;
+		},
+		/**
+		 * Ends the timer for whole exercise group.
+		 *
+		 * @return this
+		 */
 		endSeriesTimer: function() {
+			// window.console.dir('end series timer');
 			var mins, seconds;
 			if(this.seriesTimer && this.seriesTimer.start && !this.seriesTimer.end) {
 				this.seriesTimer.end = (new Date().getTime() / 1000);
 				this.seriesTimer.duration = (this.seriesTimer.end - this.seriesTimer.start);
 				mins = Math.floor(this.seriesTimer.duration / 60);
-				seconds = (this.seriesTimer.duration - (mins * 60)).toFixed(1);
+				seconds = (this.seriesTimer.duration - (mins * 60)).toFixed(0);
 				if(mins == 0) {
 					this.seriesTimer.durationString = seconds + "&Prime;";
 				} else {
