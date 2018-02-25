@@ -28,10 +28,10 @@ class RequirejsContext(object):
     def get_module_params(self, module_id):
         if 'config' not in self._config:
             return None
-        if module_id in self._config['config']:
-            return self._config['config']
-        return None
-    
+        if module_id not in self._config['config']:
+            return None
+        return self._config['config'][module_id]
+
     def set_module_params(self, module_id, params):
         module_config = {}
         module_config.update(params)
@@ -112,19 +112,6 @@ class ExerciseView(RequirejsView):
         context = {}
         er = ExerciseRepository.create(course_id=course_id)
 
-        context['group_list'] = er.getGroupList()
-        context['has_manage_perm'] = has_instructor_role(request) and has_course_authorization(request, course_id)
-        if context['has_manage_perm']:
-            if course_id is None:
-                context['manage_url'] = reverse('lab:manage')
-            else:
-                context['manage_url'] = reverse('lab:course-manage', kwargs={"course_id":course_id})
-        
-        if course_id is None:
-            context['home_url'] = reverse('lab:index')
-        else:
-            context['home_url'] = reverse("lab:course-index", kwargs={"course_id":course_id})
-
         if exercise_name is not None and group_name is not None:
             exercise = er.findExerciseByGroup(group_name, exercise_name)
             if exercise is None:
@@ -154,7 +141,23 @@ class ExerciseView(RequirejsView):
 
         # handle goto next exercise
         if request.GET.get("action", None):
-            return HttpResponse(json.dumps(exercise_context), content_type="application/json")
+            module_id = 'app/components/app/exercise'
+            self.requirejs_context.set_module_params(module_id, exercise_context)
+            module_config = self.requirejs_context.get_module_params(module_id)
+            return HttpResponse(json.dumps(module_config, ensure_ascii=False), content_type="application/json")
+
+        context['group_list'] = er.getGroupList()
+        context['has_manage_perm'] = has_instructor_role(request) and has_course_authorization(request, course_id)
+        if context['has_manage_perm']:
+            if course_id is None:
+                context['manage_url'] = reverse('lab:manage')
+            else:
+                context['manage_url'] = reverse('lab:course-manage', kwargs={"course_id":course_id})
+
+        if course_id is None:
+            context['home_url'] = reverse('lab:index')
+        else:
+            context['home_url'] = reverse("lab:course-index", kwargs={"course_id":course_id})
 
         self.requirejs_context.set_app_module('app/components/app/exercise')
         self.requirejs_context.set_module_params('app/components/app/exercise', exercise_context)

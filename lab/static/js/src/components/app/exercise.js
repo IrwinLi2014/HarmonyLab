@@ -60,7 +60,7 @@ define([
 	 */
 	AppExerciseComponent.prototype.getModels = function() {
 		var models = {};
-		var definition = this.getExerciseDefinition()
+		var definition = this.getExerciseDefinition();
 		models.midiDevice = new MidiDevice();
 		models.exerciseDefinition = new ExerciseDefinition({
 			definition: definition

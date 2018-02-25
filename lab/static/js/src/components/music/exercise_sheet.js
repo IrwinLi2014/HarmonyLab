@@ -6,6 +6,9 @@ define([
     'vexflow',
     'app/config',
     'app/components/component',
+    'app/models/exercise_chord_bank',
+    'app/models/exercise_definition',
+    'app/models/exercise_context',
     'app/utils/fontparser',
     './stave',
     './stave_notater',
@@ -17,6 +20,9 @@ define([
     Vex, 
     Config,
     Component,
+    ExerciseChordBank,
+    ExerciseDefinition,
+    ExerciseContext,
     FontParser,
     Stave, 
     StaveNotater,
@@ -501,15 +507,29 @@ define([
          */
         onGoToExercise: function(target) {
             // window.location = target.url;
+            var that = this;
             $.ajax({
                 "url": target.url,
                 "method": "GET",
                 "data": { "action": target.action },
                 "dataType": "json"
             }).done(function(response, textStatus, jqXHR) {
-                // DO SOMETHING
-                console.log(response);
+                var inputChords = new ExerciseChordBank({
+                    staffDistribution: response.staffDistribution
+                });
+                var newDefinition = new ExerciseDefinition({
+                    definition: response
+                });
+                var newContext = new ExerciseContext({
+                    inputChords: inputChords,
+                    grader: that.grader,
+                    definition: newDefinition
+                });
+
+                // HELPPPPP!!!!
+                // needs to be able to link to exercise sheet
             }).fail(function(jqXHR, textStatus) {
+                // fails to run. needs to be fixed
                 $el.html("").append("Error loading next exercise.");
             });
         }
