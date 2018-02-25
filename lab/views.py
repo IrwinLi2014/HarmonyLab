@@ -24,6 +24,13 @@ class RequirejsContext(object):
     def __init__(self, config, debug=True):
         self._debug = debug
         self._config = copy.deepcopy(config)
+
+    def get_module_params(self, module_id):
+        if 'config' not in self._config:
+            return None
+        if module_id in self._config['config']:
+            return self._config['config']
+        return None
     
     def set_module_params(self, module_id, params):
         module_config = {}
@@ -145,10 +152,14 @@ class ExerciseView(RequirejsView):
             "exerciseList": exercise.group.getList()
         })
 
+        # handle goto next exercise
+        if request.GET.get("action", None):
+            return HttpResponse(json.dumps(exercise_context), content_type="application/json")
+
         self.requirejs_context.set_app_module('app/components/app/exercise')
         self.requirejs_context.set_module_params('app/components/app/exercise', exercise_context)
         self.requirejs_context.add_to_view(context)
-        
+
         return render(request, "exercise.html", context)
 
 

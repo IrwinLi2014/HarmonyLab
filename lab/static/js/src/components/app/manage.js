@@ -135,7 +135,7 @@ define([
 		$.ajax(exercise_api_url,{
 			method: "GET"
 		}).done(function(response, textStatus, jqXHR) {
-			that.renderExerciseList(response.data);	
+			that.renderExerciseList(response.data);
 		}).fail(function(jqXHR, textStatus) {
 			$el.html("").append("Error loading exercise list.");
 		});

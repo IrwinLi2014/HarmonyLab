@@ -182,6 +182,7 @@ define([
 	 * @return undefined
 	 */
 	ExerciseFormComponent.prototype.submit = function(data) {
+		console.log(data);
 		var url = this.getSubmitUrl();
 		var that = this;
 		var errors = ''
@@ -229,7 +230,6 @@ define([
 			} else {
 				console.log("Unrecognized resopnse status:", response, textStatus);
 			}
-
 			that.trigger("afterSubmit", response);
 		}).fail(function(jqXHR, textStatus) {
 			that.notify({

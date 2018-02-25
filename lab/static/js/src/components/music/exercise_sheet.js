@@ -500,7 +500,18 @@ define([
          * @return undefined
          */
         onGoToExercise: function(target) {
-            window.location = target.url;
+            // window.location = target.url;
+            $.ajax({
+                "url": target.url,
+                "method": "GET",
+                "data": { "action": target.action },
+                "dataType": "json"
+            }).done(function(response, textStatus, jqXHR) {
+                // DO SOMETHING
+                console.log(response);
+            }).fail(function(jqXHR, textStatus) {
+                $el.html("").append("Error loading next exercise.");
+            });
         }
     });
 
